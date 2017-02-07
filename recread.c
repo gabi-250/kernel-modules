@@ -3,37 +3,53 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
+#include <linux/string.h>
+
+#define BUFF_LEN 256
+
+static char content[BUFF_LEN];
 
 static int rec_open(struct inode *inode, struct file *filp)
 {
+	printk(KERN_INFO "In %s()\n", __FUNCTION__ );
 	return 0;
 }
 
-static ssize_t rec_read(struct file *filp, char *buf,
-		size_t count, loff_t *pos)
+static ssize_t rec_read(struct file *filp, char *buffer,
+			size_t nbytes, loff_t *ppos)
 {
-	char *message = "Read recorded!\n";
-	int len = strlen(message);
-
-	if (count < len) {
+	char message[BUFF_LEN] = "Read recorded! Last written: ";
+	size_t len;
+	strcat(message, content);
+	len = strlen(message);
+	printk(KERN_INFO "In %s()\n", __FUNCTION__ );
+	if (nbytes < len) {
+	printk(KERN_INFO "In %s()\n", __FUNCTION__ );
 		return -EINVAL;
 	}
-	if (*pos != 0) {
+	if (*ppos != 0) {
 		return 0;
 	}
-
-	if (copy_to_user(buf, message, len)) {
+	if (copy_to_user(buffer, message, len)) {
 		return -EINVAL;
 	}
-	*pos = len;
+	*ppos = len;
 	return len;
 }
 
-static ssize_t rec_write(struct file *filp, const char *buf,
-		size_t count, loff_t *pos)
+static ssize_t rec_write(struct file *filp, const char __user *buffer,
+			 size_t nbytes, loff_t *ppos)
 {
-	printk(KERN_ERR "Write operation not supported!.\n");
-	return -EINVAL;
+	u_char message[BUFF_LEN];
+	printk(KERN_INFO "In %s()\n", __FUNCTION__ );
+	if (copy_from_user(message, buffer, nbytes)) {
+		printk(KERN_ERR "Could not write to recread!\n");
+		return -EINVAL;
+	}
+
+	strcpy(content, message);
+	printk(KERN_INFO "Wrote %s\n", message);
+	return (ssize_t)nbytes;
 }
 
 static struct file_operations fops = {
